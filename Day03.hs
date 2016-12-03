@@ -9,6 +9,23 @@ ex1 = isTriangle [25,5,10]
 
 solution1 = length $ filter isTriangle input
 
+chop3 xs = case (take 3 xs, drop 3 xs) of
+  (hs, []) -> [hs]
+  (hs, ts) -> hs : chop3 ts
+
+rot = concat . map chop3 . transpose
+
+ex2 = rot i
+  where
+  i = [[101 ,301 ,501]
+      ,[102 ,302 ,502]
+      ,[103 ,303 ,503]
+      ,[201 ,401 ,601]
+      ,[202 ,402 ,602]
+      ,[203 ,403 ,603]]
+
+solution2 = length $ filter isTriangle (rot input)
+
 input =
  [[566  ,477  ,376]
  ,[575  ,488  ,365]
