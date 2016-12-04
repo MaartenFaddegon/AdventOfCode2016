@@ -1,7 +1,7 @@
 import Data.List
 import Data.Char
 
-name = takeWhile (not . isDigit)
+name = init . takeWhile (not . isDigit)
 sector   = toInt 0 . filter isDigit
 checksum = take 5 . drop 1 . dropWhile (/= '[')
 
@@ -36,6 +36,22 @@ ex4 = "totally-real-room-200[decoy]"
 ex5 = realSectorSum [ex1,ex2,ex3,ex4]
 
 solution1 = realSectorSum input
+
+decode :: String -> String
+decode str = map (decode1 $ sector str) $ name str
+
+decode1 :: Int -> Char -> Char
+decode1 _ '-' = ' '
+decode1 n c = chr ((((ord c - a) + n) `mod` 26) + a) 
+  where a = ord (if isAsciiLower c then 'a' else 'A')
+
+ex6 = "qzmt-zixmtkozy-ivhz-343"
+
+solution2
+ = map sector
+ . filter ((=="northpole object storage") . decode)
+ $ filter realRoom input
+
 
 input =
   [ "hqcfqwydw-fbqijys-whqii-huiuqhsx-660[qhiwf]"
