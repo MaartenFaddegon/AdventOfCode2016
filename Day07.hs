@@ -34,6 +34,30 @@ ex6 = tls "adba[mnop]qrsta[abca]aabba" == True
 
 solution1 = length . filter tls $ input
 
+aba :: String -> [String]
+aba = filter aba' . subsequencesN 3
+aba' [a,b,c] = a /= b && a == c
+
+mkBab [a,b,_c] = [b,a,b]
+
+ssl s = any (\b -> any (==b) cand) babs
+ where
+ (xs,ys) = inout Out s [] []
+ babs = map mkBab . concat . map aba $ xs
+ cand = concat . map (subsequencesN 3) $ ys
+
+inout _ [] xs ys = (xs, ys)
+inout Out s xs ys = case s2 of []      -> (s1:xs,ys)
+                               (_:s2') -> inout In s2' (s1:xs) ys
+  where (s1,s2) = span (/='[') s
+inout In s xs ys = case s2 of []       -> (xs, s1:ys)
+                              (_:s2')  -> inout Out s2' xs (s1:ys)
+  where (s1,s2) = span (/=']') s
+
+ex7 = ssl "aba[bab]xyz" == True
+
+solution2 = length . filter ssl $ input
+
 input =
   [ "rhamaeovmbheijj[hkwbkqzlcscwjkyjulk]ajsxfuemamuqcjccbc"
   , "gdlrknrmexvaypu[crqappbbcaplkkzb]vhvkjyadjsryysvj[nbvypeadikilcwg]jwxlimrgakadpxu[dgoanojvdvwfabtt]yqsalmulblolkgsheo"
