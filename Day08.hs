@@ -55,6 +55,8 @@ ex3 = rotate Column 1 1 . rotate Row 0 4 . rotate Column 1 1 . rect 3 2 $ s0
 
 solution1 = howManyLit $ eval input
 
+solution2 = printScreen (eval input)
+
 eval :: [(Screen -> Screen)] -> Screen
 eval = foldl ap s0
   where
