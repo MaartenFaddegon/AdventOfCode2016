@@ -38,7 +38,6 @@ applyMarker (M i j) s = (s1,s2)
   s1 = concat . take j . repeat . take i $ s
   s2 = drop i s
 
-
 prop_parseDec :: NonNegative Int -> String -> Property
 prop_parseDec (NonNegative i) s = p ==> parseDec 0 (show i ++ s) == (i,s)
   where p = case s of []  -> True
@@ -49,3 +48,17 @@ prop_parseMarker (NonNegative i) (NonNegative j) s =
   parseMarker (m++s) == (M i j, s)
   where
   m = "(" ++ show i ++ "x" ++ show j ++ ")"
+
+ex5 = parse2 "X(8x2)(3x3)ABCY" == "XABCABCABCABCABCABCY"
+ex6 = length (parse2 "(27x12)(20x12)(13x14)(7x10)(1x12)A") == 241920
+ex7 = length (parse2 "(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN") == 445
+
+main = do
+  s <- readFile "Day9.input"
+  print . length . parse2 $ s
+
+parse2 ('(':rest)           = let (s1,s2) = uncurry applyMarker $ parseMarker ('(':rest)
+                              in parse2 (s1 ++ s2)
+parse2 (c:rest) | isSpace c = parse2 rest
+parse2 (c:rest)             = c : parse2 rest
+parse2 []                   = []
