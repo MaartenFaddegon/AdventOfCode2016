@@ -110,3 +110,23 @@ ex4 = do
 solution1 = do
   s <- readFile "Day10.input"
   print . filter (\(i,x,y) -> sort [x,y] == [17,61]) . solve . parse $ s
+
+solve2 stmts = solve2' env0 otherStmts
+  where 
+  env0 = foldl eval (IntMap.empty,IntMap.empty) moveStmts
+  (moveStmts,otherStmts) = (filter isMove stmts, filter (not . isMove) stmts)
+
+solve2' :: Env -> [Stmt] -> [Env]
+solve2' env stmts = case IntMap.toList (IntMap.filter hasTwo (fst env)) of
+  []          -> [env]
+  ((i,[x,y]):_) -> case filter (moveFrom i) stmts of 
+    (s:_) -> env : solve2' (eval env s) stmts
+
+solution2 = do
+  s <- readFile "Day10.input"
+  print . mulOut . last . solve2 . parse $ s
+
+  where mulOut (_,envo) = let [x] = envo ! 0
+                              [y] = envo ! 1
+                              [z] = envo ! 2
+                          in x*y*z
