@@ -53,12 +53,38 @@ ex5 = parse2 "X(8x2)(3x3)ABCY" == "XABCABCABCABCABCABCY"
 ex6 = length (parse2 "(27x12)(20x12)(13x14)(7x10)(1x12)A") == 241920
 ex7 = length (parse2 "(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN") == 445
 
-main = do
-  s <- readFile "Day9.input"
-  print . length . parse2 $ s
 
+-- correct but slow
 parse2 ('(':rest)           = let (s1,s2) = uncurry applyMarker $ parseMarker ('(':rest)
                               in parse2 (s1 ++ s2)
 parse2 (c:rest) | isSpace c = parse2 rest
 parse2 (c:rest)             = c : parse2 rest
 parse2 []                   = []
+
+
+solution2a = do
+  s <- readFile "Day9.input"
+  print . length . parse2 $ s
+
+ex8  = quickparse2 "X(8x2)(3x3)ABCY" == length "XABCABCABCABCABCABCY"
+ex9  = quickparse2 "(27x12)(20x12)(13x14)(7x10)(1x12)A" == 241920
+ex10 = quickparse2 "(25x3)(3x3)ABC(2x3)XY(5x2)PQRSTX(18x9)(3x2)TWO(5x7)SEVEN" == 445
+
+solution2b = do
+  s <- readFile "Day9.input"
+  print . quickparse2 $ s
+
+main = solution2b
+
+-- faster
+quickparse2 ('(':rest)           = let (x,s2) = uncurry applyMarker2 $ parseMarker ('(':rest)
+                                   in x + quickparse2 s2
+quickparse2 (c:rest) | isSpace c = quickparse2 rest
+quickparse2 (c:rest)             = 1 + quickparse2 rest
+quickparse2 []                   = 0
+
+applyMarker2 :: Marker -> String -> (Int, String)
+applyMarker2 (M i j) s = (x,s')
+  where
+  x  = (*j) . quickparse2 . take i $ s
+  s' = drop i s
