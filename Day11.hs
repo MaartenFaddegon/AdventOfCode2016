@@ -82,7 +82,7 @@ nextStates ss =
            then [] -- don't bring things down if all empty below
            else map (moveTo s (e-1)) $ downCombinations (ts ! e)
 
-hasEquiv s1 ss = any (\s2 -> s1' == simplifySt s2) $ map simplifySt ss
+hasEquiv s1 ss = any (\s2 -> s1' == s2) $ map simplifySt ss
   where s1' = simplifySt s1
 
 simplifySt (S e ts) = S e (IntMap.map simplify ts)
@@ -121,11 +121,11 @@ removePairs [] = []
 removePairs (t:ts) | opposite t `elem` ts = removePairs (filter (/=(opposite t)) ts)
                    | otherwise            = t : removePairs ts
 
+simplify :: [Thing] -> [Thing]
 simplify = sort . simplify'
 simplify' [] = []
-simplify' (t:ts) | opposite t `elem` ts = P : (removePairs (filter (/=(opposite t)) ts))
-                 | otherwise            = t : removePairs ts
-
+simplify' (t:ts) | opposite t `elem` ts = P : (simplify' (filter (/=(opposite t)) ts))
+                 | otherwise            = t : simplify' ts
 
 isG (G _) = True
 isG _     = False
@@ -135,3 +135,4 @@ isM _     = False
 
 opposite (M i) = G i
 opposite (G i) = M i
+opposite x     = error $ "Opposite of " ++ show x
