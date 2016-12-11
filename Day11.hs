@@ -1,15 +1,16 @@
 import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.List
-import Data.Int
+import Debug.Trace
 
 data Isotope = T | Pl | St | Pr | R                          deriving (Show,Eq,Ord)
 data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
-data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving Eq
+data State   = S {elevator :: Int, things :: IntMap [Thing], moves :: Int} deriving Eq
 
 instance Show State where
-  show (S e ts) = "elevator at " ++ show e ++ "\n"
-                   ++ unlines (map show $ reverse $ IntMap.toList ts)
+  show (S e ts mvs) = "elevator at " ++ show e ++ "\n"
+                     ++ unlines (map show $ reverse $ IntMap.toList ts)
+                     ++ "\n" ++ show mvs ++ "moves\n"
 
 -- The fourth floor contains nothing relevant.
 -- The third floor contains a promethium generator, a promethium-compatible microchip, 
@@ -18,22 +19,18 @@ instance Show State where
 -- The first floor contains a thulium generator, a thulium-compatible microchip, 
 --                          a plutonium generator, and a strontium generator.
 
-main = solution1
+main = print solution1
 
-solution1 = do
-  let ss = bfs' s0
+solution1 = bfs' s0
 
-  putStrLn "solution: "
-  putStrLn . unlines . map show $ ss
-  putStrLn $ "solved in " ++ show (length ss - 1) ++ " steps"
-
-s0 = S 1 $ IntMap.fromList [ (4,[])
+s0 = S 1 ( IntMap.fromList [ (4,[])
                            , (3,[G Pr, M Pr, G R, M R])
                            , (2,[M Pl, M St])
                            , (1,[G T, M T, G Pl, G St])
-                           ]
+                           ]) 0
 data Queue a = Queue [a] [a]
 
+queueHead (Queue [] [])       = error "empty queue!"
 queueHead (Queue [] enq)      = (x, Queue deq []) where (x:deq) = reverse enq
 queueHead (Queue (x:deq) enq) = (x, Queue deq enq)
 
@@ -41,43 +38,42 @@ queue (Queue deq enq) xs = Queue deq (xs ++ enq)
 
 queueFromList enq = Queue enq []
 
-bfs' :: State -> [State]
-bfs' s = bfs $ queueFromList [[s]]
+bfs' :: State -> Int
+bfs' s = bfs [s] $ queueFromList [s]
 
-bfs :: Queue [State] -> [State]
-bfs q | finalState (head ss) = ss
-      | otherwise            = bfs . queue q' . map (:ss) . prune $ nextStates ss
+bfs :: [State] -> Queue State -> Int
+bfs seen q | finalState s = moves s
+           | otherwise    = q'' `seq` bfs (s:seen) q''
   where 
-  (ss, q') = queueHead q
+  (s_observed, q') = queueHead q
+  s = trace ("{{{\n" ++ show s_observed ++ "}}}\n") s_observed
+  q'' = queue q' . prune seen . nextStates $ s
 
-prune []     = []
-prune (s:ss) | s `hasEquiv` ss = prune ss
-             | otherwise       = s : prune ss
+prune seen = filter (\s1 -> not $ s1 `hasEquiv` seen)
 
 finalState :: State -> Bool
-finalState (S e m) = e == 4 && all (\i -> (m ! i) == []) [1..3]
+finalState (S e m _) = e == 4 && all (\i -> (m ! i) == []) [1..3]
 
-nextStates :: [State] -> [State]
-nextStates ss = 
-  filter (\n -> safe n && not (n `hasEquiv` ss))
+nextStates :: State -> [State]
+nextStates (s@(S e ts mvs)) = filter (\n -> safe n)
     $ case e of 1 -> up
                 4 -> down
                 _ -> up ++ down
   where
-  s@(S e ts) = head ss
   up   = map (moveTo s (e+1)) $ upCombinations   (ts ! e)
   down = if all (\e' -> (ts ! e') == []) [1..e-1]
            then [] -- don't bring things down if all empty below
            else map (moveTo s (e-1)) $ downCombinations (ts ! e)
 
+hasEquiv :: State -> [State] -> Bool
 hasEquiv s1 ss = any (\s2 -> s1' == s2) $ map simplifySt ss
   where s1' = simplifySt s1
 
-simplifySt (S e ts) = S e (IntMap.map simplify ts)
+simplifySt (S e ts mvs) = S e (IntMap.map simplify ts) mvs
 
 moveTo :: State -> Int -> [Thing] -> State
-moveTo (S e m) e' ts = S e' $ IntMap.insertWith (++) e' ts
-                            $ IntMap.adjust (\\ts) e m
+moveTo (S e m mvs) e' ts = S e' ( IntMap.insertWith (++) e' ts
+                                $ IntMap.adjust (\\ts) e m) (mvs+1)
 
 combinations :: [Thing] -> [[Thing]]
 combinations ts = [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] ++ [[t] | t <- ts]
