@@ -30,6 +30,18 @@ s0 = S 1 ( IntMap.fromList [ (4,[])
                            ]) 0
 data Queue a = Queue [a] [a]
 
+exs0 = S 1 ( IntMap.fromList [ (4,[])
+                             , (3,[])
+                             , (2,[G T, M Pl])
+                             , (1,[M T])
+                             ]) 0
+
+exs1 = S 1 ( IntMap.fromList [ (4,[])
+                             , (3,[G Pl])
+                             , (2,[M Pl, G T])
+                             , (1,[M T])
+                             ]) 1
+
 queueHead (Queue [] [])       = error "empty queue!"
 queueHead (Queue [] enq)      = (x, Queue deq []) where (x:deq) = reverse enq
 queueHead (Queue (x:deq) enq) = (x, Queue deq enq)
@@ -43,11 +55,12 @@ bfs' s = bfs [s] $ queueFromList [s]
 
 bfs :: [State] -> Queue State -> Int
 bfs seen q | finalState s = moves s
-           | otherwise    = q'' `seq` bfs (s:seen) q''
+           | otherwise    = bfs seen' q''
   where 
   (s_observed, q') = queueHead q
   s = trace ("{{{\n" ++ show s_observed ++ "}}}\n") s_observed
-  q'' = queue q' . prune seen . nextStates $ s
+  q'' = queue q' . prune seen' . nextStates $ s
+  seen' = (simplifySt s):seen
 
 prune seen = filter (\s1 -> not $ s1 `hasEquiv` seen)
 
@@ -66,8 +79,10 @@ nextStates (s@(S e ts mvs)) = filter (\n -> safe n)
            else map (moveTo s (e-1)) $ downCombinations (ts ! e)
 
 hasEquiv :: State -> [State] -> Bool
-hasEquiv s1 ss = any (\s2 -> s1' == s2) $ map simplifySt ss
+hasEquiv s1 = any (\s2 -> s1' `equiv` s2)
   where s1' = simplifySt s1
+
+equiv (S e ts _) (S e' ts' _) = e == e && ts == ts'
 
 simplifySt (S e ts mvs) = S e (IntMap.map simplify ts) mvs
 
