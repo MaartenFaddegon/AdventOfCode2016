@@ -3,8 +3,8 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.List
 
 data Isotope = H | L | T | Pl | St | Pr | R                  deriving (Show,Eq,Ord)
-data Thing   = M Isotope | G Isotope                         deriving (Show,Eq,Ord)
-data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving (Show, Eq)
+data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
+data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving (Show,Eq)
 
 -- The fourth floor contains nothing relevant.
 -- The third floor contains a promethium generator, a promethium-compatible microchip, 
@@ -28,10 +28,10 @@ solution1 = do
                                    ]
 
 ex1 = search [s0]
-  where s0 = S 1 $ IntMap.fromList [ (4,sort [])
-                                   , (3,sort [G L])
-                                   , (2,sort [G H])
-                                   , (1,sort [M H, M L])
+  where s0 = S 1 $ IntMap.fromList [ (4, [])
+                                   , (3, [G L])
+                                   , (2, [G H])
+                                   , (1, [M H, M L])
                                    ]
 data Queue a = Queue [a] [a]
 
@@ -71,24 +71,39 @@ finalState (S e m) = e == 4 && all (\i -> (m ! i) == []) [1..3]
 
 nextStates :: [State] -> [State]
 nextStates ss = 
-  filter (\n -> safe n && not (n `elem` ss))
+  filter (\n -> safe n && not (n `hasEquiv` ss))
     $ case e of 1 -> up
                 4 -> down
                 _ -> up ++ down
   where
   s@(S e ts) = head ss
-  cs   = combinations (ts ! e)
-  up   = map (moveTo s (e+1)) cs
-  down = map (moveTo s (e-1)) cs
+  up   = map (moveTo s (e+1)) $ upCombinations   (ts ! e)
+  down = if all (\e' -> (ts ! e) == []) [1..e-1]
+           then [] -- don't bring things down if all empty below
+           else map (moveTo s (e-1)) $ downCombinations (ts ! e)
+
+hasEquiv s1 ss = any (\s2 -> s1' == simplifySt s2) $ map simplifySt ss
+  where s1' = simplifySt s1
+
+simplifySt (S e ts) = S e (IntMap.map simplify ts)
 
 moveTo :: State -> Int -> [Thing] -> State
-moveTo (S e m) e' ts = S e' $ IntMap.insertWith merge e' ts
-                            $ IntMap.adjust (sort . (\\ts)) e m
-  where 
-  merge xs ys = sort (xs ++ ys)
+moveTo (S e m) e' ts = S e' $ IntMap.insertWith (++) e' ts
+                            $ IntMap.adjust (\\ts) e m
+
 
 combinations :: [Thing] -> [[Thing]]
-combinations ts = [[t] | t <- ts] ++ [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2]
+combinations ts = [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] ++ [[t] | t <- ts]
+
+upCombinations :: [Thing] -> [[Thing]]
+upCombinations ts = case [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] of
+ []       ->  [[t] | t <- ts]
+ bringTwo -> bringTwo
+
+downCombinations :: [Thing] -> [[Thing]]
+downCombinations ts = case [[t] | t <- ts]  of
+ []       -> [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2]
+ bringOne -> bringOne
 
 safe :: State -> Bool
 safe = all safeFloor . things
@@ -105,6 +120,12 @@ safeFloor ts = case (removePairs ts) of
 removePairs [] = []
 removePairs (t:ts) | opposite t `elem` ts = removePairs (filter (/=(opposite t)) ts)
                    | otherwise            = t : removePairs ts
+
+simplify = sort . simplify'
+simplify' [] = []
+simplify' (t:ts) | opposite t `elem` ts = P : (removePairs (filter (/=(opposite t)) ts))
+                 | otherwise            = t : removePairs ts
+
 
 isG (G _) = True
 isG _     = False
