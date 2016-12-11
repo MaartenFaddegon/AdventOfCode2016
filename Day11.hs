@@ -2,9 +2,9 @@ import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.List
 
-data Isotope = H | L | T | Pl | St | Pr | R                  deriving (Show,Eq)
-data Thing   = M Isotope | G Isotope                         deriving (Show,Eq)
-data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving (Show,Eq)
+data Isotope = H | L | T | Pl | St | Pr | R                  deriving (Show,Eq,Ord)
+data Thing   = M Isotope | G Isotope                         deriving (Show,Eq,Ord)
+data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving (Show, Eq)
 
 -- The fourth floor contains nothing relevant.
 -- The third floor contains a promethium generator, a promethium-compatible microchip, 
@@ -28,10 +28,10 @@ solution1 = do
                                    ]
 
 ex1 = search [s0]
-  where s0 = S 1 $ IntMap.fromList [ (4,[])
-                                   , (3,[G L])
-                                   , (2,[G H])
-                                   , (1,[M H, M L])
+  where s0 = S 1 $ IntMap.fromList [ (4,sort [])
+                                   , (3,sort [G L])
+                                   , (2,sort [G H])
+                                   , (1,sort [M H, M L])
                                    ]
 data Queue a = Queue [a] [a]
 
@@ -82,8 +82,10 @@ nextStates ss =
   down = map (moveTo s (e-1)) cs
 
 moveTo :: State -> Int -> [Thing] -> State
-moveTo (S e m) e' ts = S e' $ IntMap.insertWith (++) e' ts
-                            $ IntMap.adjust (\\ts) e m
+moveTo (S e m) e' ts = S e' $ IntMap.insertWith merge e' ts
+                            $ IntMap.adjust (sort . (\\ts)) e m
+  where 
+  merge xs ys = sort (xs ++ ys)
 
 combinations :: [Thing] -> [[Thing]]
 combinations ts = [[t] | t <- ts] ++ [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2]
