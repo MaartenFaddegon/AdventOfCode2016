@@ -1,6 +1,7 @@
 import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.List
+import Data.Int
 
 data Isotope = T | Pl | St | Pr | R                          deriving (Show,Eq,Ord)
 data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
@@ -65,7 +66,7 @@ nextStates ss =
   where
   s@(S e ts) = head ss
   up   = map (moveTo s (e+1)) $ upCombinations   (ts ! e)
-  down = if all (\e' -> (ts ! e) == []) [1..e-1]
+  down = if all (\e' -> (ts ! e') == []) [1..e-1]
            then [] -- don't bring things down if all empty below
            else map (moveTo s (e-1)) $ downCombinations (ts ! e)
 
