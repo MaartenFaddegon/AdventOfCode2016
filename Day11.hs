@@ -2,9 +2,13 @@ import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.List
 
-data Isotope = H | L | T | Pl | St | Pr | R                  deriving (Show,Eq,Ord)
+data Isotope = T | Pl | St | Pr | R                          deriving (Show,Eq,Ord)
 data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
-data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving (Show,Eq)
+data State   = S {elevator :: Int, things :: IntMap [Thing]} deriving Eq
+
+instance Show State where
+  show (S e ts) = "elevator at " ++ show e ++ "\n"
+                   ++ unlines (map show $ reverse $ IntMap.toList ts)
 
 -- The fourth floor contains nothing relevant.
 -- The third floor contains a promethium generator, a promethium-compatible microchip, 
@@ -21,18 +25,12 @@ solution1 = do
   putStrLn "solution: "
   putStrLn . unlines . map show $ ss
   putStrLn $ "solved in " ++ show (length ss - 1) ++ " steps"
-  where s0 = S 1 $ IntMap.fromList [ (4,[])
-                                   , (3,[G Pr, M Pr, G R, M R])
-                                   , (2,[M Pl, M St])
-                                   , (1,[G T, M T, G Pl, G St])
-                                   ]
 
-ex1 = search [s0]
-  where s0 = S 1 $ IntMap.fromList [ (4, [])
-                                   , (3, [G L])
-                                   , (2, [G H])
-                                   , (1, [M H, M L])
-                                   ]
+s0 = S 1 $ IntMap.fromList [ (4,[])
+                           , (3,[G Pr, M Pr, G R, M R])
+                           , (2,[M Pl, M St])
+                           , (1,[G T, M T, G Pl, G St])
+                           ]
 data Queue a = Queue [a] [a]
 
 queueHead (Queue [] enq)      = (x, Queue deq []) where (x:deq) = reverse enq
@@ -47,24 +45,13 @@ bfs' s = bfs $ queueFromList [[s]]
 
 bfs :: Queue [State] -> [State]
 bfs q | finalState (head ss) = ss
-      | otherwise            = bfs . queue q' . map (:ss) $ nextStates ss
+      | otherwise            = bfs . queue q' . map (:ss) . prune $ nextStates ss
   where 
   (ss, q') = queueHead q
 
-search :: [State] -> Maybe [State]
-search ss | finalState (head ss) = Just ss
-search ss = shortest . map (\n -> search (n:ss)) . nextStates $ ss
-
-shortest :: [Maybe [State]] -> Maybe [State]
-shortest = shortest' Nothing
-shortest' x []     = x
-shortest' x (y:ms) | x `shorter` y = shortest' x ms
-                   | otherwise     = shortest' y ms
-  where
-  shorter Nothing  Nothing  = True
-  shorter (Just _) Nothing  = True
-  shorter Nothing  (Just _) = False
-  shorter (Just m) (Just n) = length m < length n
+prune []     = []
+prune (s:ss) | s `hasEquiv` ss = prune ss
+             | otherwise       = s : prune ss
 
 finalState :: State -> Bool
 finalState (S e m) = e == 4 && all (\i -> (m ! i) == []) [1..3]
@@ -90,7 +77,6 @@ simplifySt (S e ts) = S e (IntMap.map simplify ts)
 moveTo :: State -> Int -> [Thing] -> State
 moveTo (S e m) e' ts = S e' $ IntMap.insertWith (++) e' ts
                             $ IntMap.adjust (\\ts) e m
-
 
 combinations :: [Thing] -> [[Thing]]
 combinations ts = [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] ++ [[t] | t <- ts]
