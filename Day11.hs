@@ -1,161 +1,163 @@
-import Data.IntMap.Strict (IntMap,(!))
-import qualified Data.IntMap.Strict as IntMap
-import Data.List
-import Debug.Trace
-import Data.Bits
 import Data.Int
+import Data.Bits
+import Data.Vector(Vector,(//),(!))
+import qualified Data.Vector as Vector
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Queue
+import Debug.Trace
 
-data Isotope = T | Pl | St | Pr | R                          deriving (Show,Eq,Ord)
-data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
-data State   = S {elevator :: Int, things :: IntMap [Thing], moves :: Int} deriving Eq
+type State = Vector Int64
+type Fingerprint = [Int64]
 
-encode :: Thing -> Int64 -- takes 10 bits
-encode (M T)  = 1
-encode (M Pl) = 2
-encode (M St) = 4
-encode (M Pr) = 8
-encode (M R)  = 16
-encode (G T)  = 32
-encode (G Pl) = 64
-encode (G St) = 128
-encode (G Pr) = 256
-encode (G R)  = 512
+isos = [1,2,4,8,16]
 
-encodeFloor :: [Thing] -> Int64
-encodeFloor = foldl (\i t -> i .|. (encode t)) 0
+isoBits = length isos
 
-fingerprint :: State -> Int64
-fingerprint (S e ts _) = foldl (.|.) (fromIntegral e) floors
-  where
-  floors = [shiftL (encodeFloor (ts ! i)) (10*i+4) | i <- [1..4]]
+lvtrIdx = 8
+mvsIdx  = 9
 
-instance Show State where
-  show (S e ts mvs) = "elevator at " ++ show e ++ "\n"
-                     ++ unlines (map show $ reverse $ IntMap.toList ts)
-                     ++ "\n" ++ show mvs ++ "moves\n"
+showStates = unlines . map showState
 
--- The fourth floor contains nothing relevant.
--- The third floor contains a promethium generator, a promethium-compatible microchip, 
---                          a ruthenium generator, and a ruthenium-compatible microchip.
--- The second floor contains a plutonium-compatible microchip and a strontium-compatible microchip.
--- The first floor contains a thulium generator, a thulium-compatible microchip, 
---                          a plutonium generator, and a strontium generator.
-
-main = print solution1
-
-solution1 = bfs' s0
-
-s0 = S 1 ( IntMap.fromList [ (4,[])
-                           , (3,[G Pr, M Pr, G R, M R])
-                           , (2,[M Pl, M St])
-                           , (1,[G T, M T, G Pl, G St])
-                           ]) 0
-data Queue a = Queue [a] [a]
-
-exs0 = S 1 ( IntMap.fromList [ (4,[])
-                             , (3,[])
-                             , (2,[G T, M Pl])
-                             , (1,[M T])
-                             ]) 0
-
-exs1 = S 1 ( IntMap.fromList [ (4,[])
-                             , (3,[G Pl])
-                             , (2,[M Pl, G T])
-                             , (1,[M T])
-                             ]) 1
-
-queueHead (Queue [] [])       = error "empty queue!"
-queueHead (Queue [] enq)      = (x, Queue deq []) where (x:deq) = reverse enq
-queueHead (Queue (x:deq) enq) = (x, Queue deq enq)
-
-queue (Queue deq enq) xs = Queue deq (xs ++ enq)
-
-queueFromList enq = Queue enq []
-
-bfs' :: State -> Int
-bfs' s = bfs [fingerprint s] $ queueFromList [s]
-
-bfs :: [Int64] -> Queue State -> Int
-bfs seen q | finalState s = moves s
-           | otherwise    = bfs seen' q''
+showState :: State -> String
+showState s = (concat . reverse 
+               $ [show i ++ ":" ++ (e i) ++ showFloor (s ! (2*i)) (s ! (2*i+1)) | i <- [0..3]]
+              ) ++ "after " ++ show mvs ++ " moves\n"
   where 
-  (s_observed, q') = queueHead q
-  s = trace ("{{{\n" ++ show s_observed ++ "}}}\n") s_observed
-  q'' = queue q' . map fst . prune seen' . addFingerprint . nextStates $ s
-  seen' = (fingerprint s):seen
+  e j = if (fromIntegral j) == (s ! lvtrIdx) then " E " else "   "
+  mvs = s ! mvsIdx
 
-addFingerprint = map (\s -> (s,fingerprint s))
+showFloor :: Int64 -> Int64 -> String
+showFloor ms gs = (concat $ map (\m -> "M " ++ show m ++ " ") (toList ms))
+                  ++ (concat $ map (\g -> "G " ++ show g ++ " ") (toList gs)) ++ "\n"
 
-prune seen = filter (\(_,p) -> not $ p `elem` seen)
--- prune seen = filter (\s1 -> not $ s1 `hasEquiv` seen)
+-- The first floor contains a hydrogen-compatible microchip and a lithium-compatible microchip.
+-- The second floor contains a hydrogen generator.
+-- The third floor contains a lithium generator.
+-- The fourth floor contains nothing relevant.
+--
+-- hydrogen = 1
+-- lithium  = 2
+
+--                     microchips generators elevator moves
+exs0 :: State          ---------- ---------- -------- -----
+exs0 = Vector.fromList [ 1 .|. 2   , 0
+                       , 0         , 1
+                       , 0         , 2
+                       , 0         , 0       , 0      , 0 ]
+
+-- The first floor contains a thulium generator, a thulium-compatible microchip, a plutonium generator, and a strontium generator.
+-- The second floor contains a plutonium-compatible microchip and a strontium-compatible microchip.
+-- The third floor contains a promethium generator, a promethium-compatible microchip, a ruthenium generator, and a ruthenium-compatible microchip.
+-- The fourth floor contains nothing relevant.
+--
+th = 1
+pl = 2
+st = 4
+pr = 8
+ru = 16
+
+--                        microchips      generators 
+input1 :: State           ----------  -----------------
+input1 = Vector.fromList [ th        , th .|. pl .|. st
+                         , pl .|. st , 0
+                         , pr .|. ru , pr .|. ru
+                         , 0         , 0
+--                       elevator moves
+                         -------- -----
+                         , 0      , 0 ]
+
+
+main = print (bfs' input1)
+
+ex1 = putStr . showStates . map snd $ ex1'
+ex1' = nextStates seen0 exs0
+seen0 = Set.singleton . fingerprint $ exs0
+(fphex1,hex1) = head ex1'
+
+ex2 = putStr . showStates . map snd $ ex2'
+ex2' = nextStates seen1 hex1
+seen1 = Set.insert fphex1 seen0
+
+ex3 = bfs' exs0
+
+bfs' :: State -> Int64
+bfs' s = bfs seen0 $ queueFromList [s]
+  where 
+  seen0 = Set.singleton . fingerprint $ s
+
+bfs :: Set Fingerprint -> Queue State -> Int64
+bfs seen q | finalState s = s ! mvsIdx
+           | otherwise    = bfs seen' (queue q' ns)
+  where 
+  (s, q') = queueHead q
+  (fps,ns) = unzip $ nextStates seen s
+  seen' = foldr Set.insert seen fps
 
 finalState :: State -> Bool
-finalState (S e m _) = e == 4 && all (\i -> (m ! i) == []) [1..3]
+finalState s = all (\i -> (s ! (2*i) == 0) && (s ! (2*i+1) == 0)) [0..2]
 
-nextStates :: State -> [State]
-nextStates (s@(S e ts mvs)) = filter (\n -> safe n)
-    $ case e of 1 -> up
-                4 -> down
-                _ -> up ++ down
+nextStates :: Set [Int64] -> State -> [([Int64],State)]
+nextStates seen = prune seen . tag . filter safe . nextStates'
+  where 
+  tag = map (\s -> (fingerprint s, s))
+
+nextStates' :: State -> [State]
+nextStates' s = [moveTo s e' x | e' <- e's, x <- combinations ms_e gs_e]
   where
-  up   = map (moveTo s (e+1)) $ upCombinations   (ts ! e)
-  down = if all (\e' -> (ts ! e') == []) [1..e-1]
-           then [] -- don't bring things down if all empty below
-           else map (moveTo s (e-1)) $ downCombinations (ts ! e)
+  e   = s ! lvtrIdx
+  e's = case e of
+         0 -> [1]
+         3 -> [2]
+         _ -> [e+1, e-1]
+  mvs = s ! mvsIdx
+  ms_e = toList (s ! (fromIntegral $ 2*e))
+  gs_e = toList (s ! (fromIntegral $ 2*e+1))
 
-hasEquiv :: State -> [State] -> Bool
-hasEquiv s1 = any (\s2 -> s1' `equiv` s2)
-  where s1' = simplifySt s1
-
-equiv (S e ts _) (S e' ts' _) = e == e && ts == ts'
-
-simplifySt (S e ts mvs) = S e (IntMap.map simplify ts) mvs
-
-moveTo :: State -> Int -> [Thing] -> State
-moveTo (S e m mvs) e' ts = S e' ( IntMap.insertWith (++) e' ts
-                                $ IntMap.adjust (\\ts) e m) (mvs+1)
-
-combinations :: [Thing] -> [[Thing]]
-combinations ts = [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] ++ [[t] | t <- ts]
-
-upCombinations :: [Thing] -> [[Thing]]
-upCombinations ts = case [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2] of
- []       ->  [[t] | t <- ts]
- bringTwo -> bringTwo
-
-downCombinations :: [Thing] -> [[Thing]]
-downCombinations ts = case [[t] | t <- ts]  of
- []       -> [[t1,t2] | t1 <- ts, t2 <-ts, t1 /= t2]
- bringOne -> bringOne
+prune :: Set Fingerprint -> [(Fingerprint,State)] -> [(Fingerprint,State)]
+prune seen = filter (\(fp,_) -> fp `Set.notMember` seen)
 
 safe :: State -> Bool
-safe = all safeFloor . things
+safe s = all (\i -> safeFloor (s!(2*i)) (s!(2*i+1))) [0..3]
+safeFloor _  0  = True
+safeFloor ms gs = (ms .&. gs) `xor` ms == 0
 
-safeFloor :: [Thing] -> Bool
-safeFloor ts = case (removePairs ts) of
-  []  -> True
-  ts' -> case (any isG ts', any isM ts') of
-           (True,True)   -> False
-           (True,False)  -> True
-           (False,True)  -> True
-           (False,False) -> True
+combinations  ms gs = (combinations2 ms gs) ++ (combinations1 ms gs)
+combinations1 ms gs =  [(m,0)  | m <- ms]                -- one of each
+                    ++ [(0,g)  | g <- gs]
+combinations2 ms gs =  [(m,g)  | m <- ms, g <- gs]       -- one of each
+                    ++ [(0,g)  | g <- combinations2' gs] -- two of either
+                    ++ [(m,0)  | m <- combinations2' ms]
 
-removePairs [] = []
-removePairs (t:ts) | opposite t `elem` ts = removePairs (filter (/=(opposite t)) ts)
-                   | otherwise            = t : removePairs ts
+combinations2' []     = []
+combinations2' (t1:ts) = [t1 .|. t2 | t2 <- ts] ++ combinations2' ts
+  
+toList :: Int64 -> [Int64]
+toList x = [y | i <- isos, let y = x .&. i, y /= 0]
 
-simplify :: [Thing] -> [Thing]
-simplify = sort . simplify'
-simplify' [] = []
-simplify' (t:ts) | opposite t `elem` ts = P : (simplify' (filter (/=(opposite t)) ts))
-                 | otherwise            = t : simplify' ts
+moveTo :: State -> Int64 -> (Int64,Int64) -> State
+moveTo s j' (ms,gs) = s // [ (2*i,  ms_i `xor` ms)     -- remove from floor i
+                           , (2*i+1,gs_i `xor` gs)
+                           , (2*j,  ms_j `xor` ms)     -- add to floor j
+                           , (2*j+1,gs_j `xor` gs)
+                           , (lvtrIdx, fromIntegral j) -- elevator at floor j
+                           , (mvsIdx, mvs+1)           -- one more move
+                           ]
+  where i = fromIntegral (s ! lvtrIdx)
+        j = fromIntegral j'
+        ms_i = s ! (2*i)
+        gs_i = s ! (2*i+1)
+        ms_j = s ! (2*j)
+        gs_j = s ! (2*j+1)
+        mvs  = s ! mvsIdx
 
-isG (G _) = True
-isG _     = False
+fingerprint :: State -> Fingerprint
+fingerprint s = (s ! lvtrIdx) : [fingerprintFloor (s ! (2*i)) (s ! (2*i+1)) | i <- [0..3]]
+ 
+fingerprintFloor :: Int64 -> Int64 -> Int64
+fingerprintFloor ms gs = 
+  (shiftL (isoCount ps) (2*isoBits)) .|. (shiftL (ms `xor` ps) isoBits) .|. (gs `xor` ps)
+  where
+  ps = ms .&. gs
 
-isM (M _) = True
-isM _     = False
-
-opposite (M i) = G i
-opposite (G i) = M i
-opposite x     = error $ "Opposite of " ++ show x
+isoCount xs = foldl (\i b -> if xs .&. b == 0 then i else i+1) 0 isos
