@@ -10,7 +10,7 @@ import Debug.Trace
 type State = Vector Int64
 type Fingerprint = [Int64]
 
-isos = [1,2,4,8,16]
+isos = [1,2,4,8,16,32,64]
 
 isoBits = length isos
 
@@ -67,8 +67,29 @@ input1 = Vector.fromList [ th        , th .|. pl .|. st
                          -------- -----
                          , 0      , 0 ]
 
+-- extra parts on the first floor:
+-- 
+--     An elerium generator.
+--     An elerium-compatible microchip.
+--     A dilithium generator.
+--     A dilithium-compatible microchip.
 
-main = print (bfs' input1)
+el = 32
+di = 64
+
+--                        microchips      generators 
+input2 :: State           ----------  -----------------
+input2 = Vector.fromList [ th .|. el .|. di , th .|. pl .|. st .|. el .|. di
+                         , pl .|. st        , 0
+                         , pr .|. ru        , pr .|. ru
+                         , 0                , 0
+--                       elevator moves
+                         -------- -----
+                         , 0      , 0 ]
+
+
+
+main = print (bfs' input2)
 
 ex1 = putStr . showStates . map snd $ ex1'
 ex1' = nextStates seen0 exs0
