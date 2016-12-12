@@ -2,10 +2,32 @@ import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 import Data.List
 import Debug.Trace
+import Data.Bits
+import Data.Int
 
 data Isotope = T | Pl | St | Pr | R                          deriving (Show,Eq,Ord)
 data Thing   = P | M Isotope | G Isotope                     deriving (Show,Eq,Ord)
 data State   = S {elevator :: Int, things :: IntMap [Thing], moves :: Int} deriving Eq
+
+encode :: Thing -> Int64 -- takes 10 bits
+encode (M T)  = 1
+encode (M Pl) = 2
+encode (M St) = 4
+encode (M Pr) = 8
+encode (M R)  = 16
+encode (G T)  = 32
+encode (G Pl) = 64
+encode (G St) = 128
+encode (G Pr) = 256
+encode (G R)  = 512
+
+encodeFloor :: [Thing] -> Int64
+encodeFloor = foldl (\i t -> i .|. (encode t)) 0
+
+fingerprint :: State -> Int64
+fingerprint (S e ts _) = foldl (.|.) (fromIntegral e) floors
+  where
+  floors = [shiftL (encodeFloor (ts ! i)) (10*i+4) | i <- [1..4]]
 
 instance Show State where
   show (S e ts mvs) = "elevator at " ++ show e ++ "\n"
@@ -51,18 +73,21 @@ queue (Queue deq enq) xs = Queue deq (xs ++ enq)
 queueFromList enq = Queue enq []
 
 bfs' :: State -> Int
-bfs' s = bfs [s] $ queueFromList [s]
+bfs' s = bfs [fingerprint s] $ queueFromList [s]
 
-bfs :: [State] -> Queue State -> Int
+bfs :: [Int64] -> Queue State -> Int
 bfs seen q | finalState s = moves s
            | otherwise    = bfs seen' q''
   where 
   (s_observed, q') = queueHead q
   s = trace ("{{{\n" ++ show s_observed ++ "}}}\n") s_observed
-  q'' = queue q' . prune seen' . nextStates $ s
-  seen' = (simplifySt s):seen
+  q'' = queue q' . map fst . prune seen' . addFingerprint . nextStates $ s
+  seen' = (fingerprint s):seen
 
-prune seen = filter (\s1 -> not $ s1 `hasEquiv` seen)
+addFingerprint = map (\s -> (s,fingerprint s))
+
+prune seen = filter (\(_,p) -> not $ p `elem` seen)
+-- prune seen = filter (\s1 -> not $ s1 `hasEquiv` seen)
 
 finalState :: State -> Bool
 finalState (S e m _) = e == 4 && all (\i -> (m ! i) == []) [1..3]
