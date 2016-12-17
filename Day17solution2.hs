@@ -1,22 +1,22 @@
-module Day17solution1 where
 import Data.Hash.MD5
 import Queue
 
 data State     = S (Int,Int) String
 data Direction = U | D | L | R       deriving Show
 
-ex0 = directions "hijkl"
+main = print solution2
 
 ex1 = search "ihgpwlah"
 
-solution1 = search "dmypynyp"
+solution2 = search "dmypynyp"
 
-search :: String -> String
-search s = drop (length s) . bfs . queueFromList $ [S (0,0) s]
+search :: String -> Int
+search s = (bfs (queueFromList [S (0,0) s]) 0) - (length s)
 
-bfs :: Queue State -> String
-bfs q | finalState s = p
-      | otherwise    = bfs (queue q' ns)
+bfs :: Queue State -> Int -> Int
+bfs q x | queueEmpty q = x
+        | finalState s = bfs q' (length p)
+        | otherwise    = bfs (queue q' ns) x
   where 
   (s, q') = queueHead q
   (S _ p) = s
