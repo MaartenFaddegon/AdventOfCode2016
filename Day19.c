@@ -41,13 +41,17 @@ void delete(node* n) {
 
 int main() {
   int m = 3014603;
-  node* cursor = mkNodes(m);
+  // int m = 5;
+  node* head = mkNodes(m);
+  node* cursor = next(head, m/2);
 
   do {
-    delete(next(cursor, m/2));
-    cursor = cursor->next;
+    delete(cursor);
+    if ((m%2) == 1) {
+      cursor = cursor->next;
+    }
     m--;
-  } while (cursor != cursor->next);
+  } while (m > 1);
 
   printf("%i\n", cursor->val);
 }
