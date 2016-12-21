@@ -1,4 +1,3 @@
-module Day21 where
 import Data.List
 
 data Direction   = Lft | Rght               deriving Show
@@ -11,9 +10,13 @@ data Instruction = Swap Value Value
                  | RotateB Value
                  | Reverse Value            deriving Show
 
--- Wrong: facghedb
--- also wrong: fdbagche
+main = print solution2
+
 solution1 = foldl eval "abcdefgh" instructions
+
+solution2 = filter (\s -> foldl eval s instructions == "fbgdceah") (permutations "abcdefgh")
+  -- foldl eval "fbgdceah" $ reverse (map inverse instructions)
+  -- inverse = ...  went for the easy solution there :)
 
 eval s (Swap (Position i) (Position j)) = swapP i j s
 eval s (Swap (Letter c)   (Letter d))   = swapL c d s
