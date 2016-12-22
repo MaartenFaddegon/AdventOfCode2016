@@ -1,4 +1,6 @@
-module Day19 where
+import Queue
+
+main = print solution2
 
 step [] (x:[]) = x
 step ys []     = step [] (reverse ys)
@@ -10,16 +12,25 @@ ex1 = step [] [1..5]
 solution1 = step [] [1..3014603]
 
 
--- Part 2 is quadratic due to repeatedly finding the middle
--- see the C solution with a midpoint-cursor in a circualar linked list.
--- There are some fancy structures in Haskell that can get close (time log n)
--- but in this case maybe we should just recognize that C is the right tool 
--- for the job here.
-
+-- go: a naive but quadratic implementation of part 2
 go [x] = x
 go xs  = go $ ys ++ (zs ++ [y])
   where i = (length xs) `div` 2
         (y:ys,_:zs) = splitAt i xs
 
-ex2 = go [1..5]
-solution2 = go [1..3014603]
+ex2 = kill [1..5]
+solution2 = kill [1..3014603]
+
+kill xs = kill' m (queueFromList $ rotate (m `div` 2) xs) where m = length xs
+
+kill' :: Int -> Queue Int -> Int
+kill' 1 q = fst (queueHead q)
+kill' m q | m `mod` 2 == 1 = kill' (m-1) (skip1 q')
+          | otherwise      = kill' (m-1) q'
+  where (_,q') = queueHead q
+
+
+skip1 q = queue q' [x]
+  where (x,q') = queueHead q
+
+rotate m xs = zs ++ ys where (ys,zs) = splitAt m xs
