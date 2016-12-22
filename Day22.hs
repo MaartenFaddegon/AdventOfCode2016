@@ -1,36 +1,70 @@
 import Queue
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.List
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 
 data Node = Node { coordinates :: (Int,Int), nodeUsed :: Int, nodeAvail :: Int, token :: Bool}
             deriving (Show, Eq, Ord)
 
-data State = S [Node] Int
+data State = S (Int,Int) -- location of the empty node
+               (Int,Int) -- location of the goal data
+             deriving (Show, Eq, Ord)
 
-main = print $ bfs (Set.singleton input) (queueFromList [S input 0])
+state0 = S (coordinates emptyDisk) (35,0)
 
-bfs :: Set [Node] -> Queue State -> Int
-bfs seen q | finalState ns = i
-           | otherwise     = bfs seen' (queue q' ss)
+main = putStr . showStates $ bfs (Set.singleton state0) (queueFromList [[(state0,0)]])
+
+
+showStates [] = ""
+showStates ((S e g,i) : rest) = 
+  showStates rest ++ "\n\n step " ++ show i ++ mv ++ "\n\n" ++ showMap e g
+  where
+  mv = case rest of 
+         []                -> ""
+         ((S e' _,_) : _ ) -> ": swap " ++ show e' ++ " with " ++ show e
+  
+
+bfs :: Set State -> Queue [(State,Int)] -> [(State,Int)]
+bfs seen q | finalState t = s
+           | otherwise    = bfs seen' (queue q' ss)
   where 
-  (S ns i, q') = queueHead q
-  ss           = filter (notSeen seen) $ map (move $ S ns i) (moves ns)
-  seen'        = foldr Set.insert seen (map (\(S x _) -> x) ss)
+  (s, q') = queueHead q
+  ss          = [(s',i+1):s | s' <- ss']
+  ss'         = filter (`Set.notMember` seen) $ nextStates t
+  seen'       = foldr Set.insert seen ss'
+  (t,i)       = head s
 
-notSeen seen (S n _) = n `Set.notMember` seen
+finalState (S e g) = g == (0,0)
 
-finalState :: [Node] -> Bool
-finalState = token . head . filter ((==(0,0)) . coordinates)
+nextStates (S e g) = map nextState e's
+  where
+  e's          = viableNeighbours e
+  nextState e' | e' == g   = S e' e -- goal data moved
+               | otherwise = S e' g -- only empty disk is moved
 
-move (S ns i) (Node c1 u1 a1 t1, Node c2 u2 a2 t2)  = S ns'' (i+1)
-  where 
-  ns'  = filter (\n -> coordinates n /= c1 && coordinates n /= c2) ns
-  ns'' = (Node c1 0 (a1+u1) False) : (Node c2 (u2+u1) (a2-u1) (t1 || t2)) : ns'
+viableNeighbours (x,y) = filter (isViable . c2idx) [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
 
-moves = filter neighbouring . filter viable . pairs
+showMap e g = concat $ intersperse "\n" [showLine e g y | y <- [0..24]]
 
-neighbouring (Node{coordinates = (x1,y1)}, Node{coordinates = (x2,y2)}) =
-  (x1,y1) == (x2+1,y2) || (x1,y1) == (x2-1,y2) || (x1,y1) == (x2,y2+1) || (x1,y1) == (x2,y2-1)
+showLine e g y = intersperse ' ' [showDisk e g (x,y) | x <- [0..35]] ++ show y
+
+showDisk e g c | c == e             = '_'
+               | c == g             = 'G'
+               | isViable (c2idx c) = '.' 
+               | otherwise          = '#'
+
+emptyDisk = head $ filter ((==0) . nodeUsed) input
+
+isViable idx = IntMap.member idx viableDisks
+
+viableDisks = IntMap.fromList
+  $ map (\d -> (c2idx (coordinates d), d))
+  $ nub (map fst viablePairs ++ map snd viablePairs)
+
+c2idx (x,y) | x < 36    = x+y*36
+            | otherwise = -1      -- will never be member ...
 
 solution1 = length viablePairs
 
