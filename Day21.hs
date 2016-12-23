@@ -14,10 +14,25 @@ main = print solution2
 
 solution1 = foldl eval "abcdefgh" instructions
 
+-- There are only 8! = 40320 permutations of "abcdefgh", so we
+-- can find the input by just trying all and comparing the output.
 solution2 = filter (\s -> foldl eval s instructions == "fbgdceah") (permutations "abcdefgh")
-  -- foldl eval "fbgdceah" $ reverse (map inverse instructions)
-  -- inverse = ...  went for the easy solution there :)
 
+-- An alternative solution that is faster (but was a bit more work to write)
+-- is to reverse the instructions.
+solution2' = foldl lave "fbgdceah" $ reverse instructions
+
+-- inverse evaluation for part 2
+lave s (Swap (Position i) (Position j)) = swapP i j s
+lave s (Swap (Letter c)   (Letter d))   = swapL c d s
+lave s (Rotate Lft i)                   = rot Rght i s
+lave s (Rotate Rght i)                  = rot Lft i s
+lave s (RotateB (Letter c))             = bRot c s
+lave s (Reverse (Positions i j))        = rev i j s
+lave s (Move (Position i) (Position j)) = mv j i s
+lave _ i = error $ "lave undefined for instruction " ++ show i
+
+-- eval for part 1
 eval s (Swap (Position i) (Position j)) = swapP i j s
 eval s (Swap (Letter c)   (Letter d))   = swapL c d s
 eval s (Rotate d i)                     = rot d i s
@@ -45,6 +60,15 @@ rotB c s = rot Rght (i+j+1) s
   where
   (Just i) = findIndex (==c) s
   j = if i > 3 then 1 else 0
+
+bRot c s = rot Lft j s
+  where
+  (Just i) = findIndex (==c) s
+  (Just j) = (lookup i lut)
+
+lut = mkLut "abcdefgh"
+
+mkLut s2 = map (\c -> let s = rotB c s2; (Just i) = findIndex (==c) s; (Just j) = findIndex (==c) s2 in (i,(i+8-j) `mod` 8)) s2
 
 rev i j s | i > j = rev j i s
 rev i j s = as ++ (reverse bs) ++ cs
