@@ -1,7 +1,7 @@
 import Data.IntMap.Strict (IntMap,(!))
 import qualified Data.IntMap.Strict as IntMap
 
-data Val = V Int | R Int deriving Show
+data Val = V Int | R Int deriving (Show, Eq)
 data Instr = CPY Val Val | INC Val | DEC Val | JNZ Val Val | TGL Val deriving Show
 type Env = IntMap Int
 type Prgm = [Instr]
@@ -19,7 +19,6 @@ env0 = foldr (\r -> set r 0) IntMap.empty [0..3]
 -- inc x increases the value of register x by one.
 -- dec x decreases the value of register x by one.
 -- jnz x y jumps to an instruction y away (positive means forward; negative means backward), but only if x is not zero.
-
 
 cpy (V _)  (V _) env = (env, 1)
 cpy (V v)  (R r) env = (set r v env, 1)
@@ -56,11 +55,15 @@ tgl' (CPY x y) = JNZ x y
 substitute idx fn xs = ys ++ (fn x) : zs
   where (ys, x:zs) = splitAt idx xs
 
-eval = eval' 0 (set 0 7 $ env0)
+eval = eval' 0  (set 0 7 $ env0)
+eval2 = eval' 0 (set 0 12 $ env0)
 
 eval' :: Int -> Env -> Prgm -> [String]
 eval' pc env instr
   | pc >= length instr = [showEnv env]
+  | pc + 2 < length instr && isMul i0 i1 i2 = 
+      let (env', d) = mul i0 i1 env
+      in (show pc ++ ": mul " ++ showEnv env) : eval' (pc+d) env' instr
   | otherwise          = 
       let (instr', (env', d)) = case i of
                         CPY x y -> (instr, cpy x y env)
@@ -71,6 +74,16 @@ eval' pc env instr
       in (show pc ++ ": " ++ show i ++ " " ++ showEnv env)
          : eval' (pc+d) env' instr'
   where i = instr !! pc
+        i0 = i
+        i1 = instr !! (pc + 1)
+        i2 = instr !! (pc + 2)
+
+isMul (INC (R r1)) (DEC (R r2)) (JNZ (R r2') (V (-2))) = r2 == r2'
+isMul _ _ _ = False
+
+mul (INC (R r1)) (DEC (R r2)) env = (set r1 (v1*v2) . set r2 0 $ env, 3)
+  where v1 = get r1 env
+        v2 = get r2 env
 
 showEnv :: Env -> String
 showEnv = show . map snd . IntMap.toList 
@@ -90,8 +103,10 @@ ex1 = eval
   , DEC a
   ]
 
-main = mapM putStrLn solution1
 solution1 = eval input
+
+solution2 = eval2 input
+main = mapM putStrLn solution2
 
 input = 
   [ CPY a b
