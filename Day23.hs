@@ -61,9 +61,13 @@ eval2 = eval' 0 (set 0 12 $ env0)
 eval' :: Int -> Env -> Prgm -> [String]
 eval' pc env instr
   | pc >= length instr = [showEnv env]
-  | pc + 2 < length instr && isMul i0 i1 i2 = 
-      let (env', d) = mul i0 i1 env
-      in (show pc ++ ": mul " ++ showEnv env) : eval' (pc+d) env' instr
+  | pc + 6 < length instr && isMul env i0 i1 i2 i3 i4 i5 = 
+      let env' :: Env 
+          env' = mul i0 i1 i4 env
+      in (show pc ++ ": " ++ showMul i0 i1 i4 ++ showEnv env) : eval' (pc+6) env' instr
+  | pc + 2 < length instr && isAdd env i0 i1 i2 = 
+      let (env', d) = add i0 i1 env
+      in (show pc ++ ": " ++ showAdd i0 i1 ++ showEnv env) : eval' (pc+d) env' instr
   | otherwise          = 
       let (instr', (env', d)) = case i of
                         CPY x y -> (instr, cpy x y env)
@@ -77,13 +81,51 @@ eval' pc env instr
         i0 = i
         i1 = instr !! (pc + 1)
         i2 = instr !! (pc + 2)
+        i3 = instr !! (pc + 3)
+        i4 = instr !! (pc + 4)
+        i5 = instr !! (pc + 5)
 
-isMul (INC (R r1)) (DEC (R r2)) (JNZ (R r2') (V (-2))) = r2 == r2'
-isMul _ _ _ = False
+-- isAdd env (INC (R r1)) 
+--           (DEC (R r2)) 
+--           (JNZ (R r2') (V (-2))) = 
+--   r2 == r2' && (get r1 env) /= 0 && (get r2 env) > 0
+isAdd _ _ _ _ = False
 
-mul (INC (R r1)) (DEC (R r2)) env = (set r1 (v1*v2) . set r2 0 $ env, 3)
+add (INC (R r1)) (DEC (R r2)) env = (set r1 (v1+v2) . set r2 0 $ env, 3)
   where v1 = get r1 env
         v2 = get r2 env
+
+showAdd (INC r1) (DEC r2) = "add (" ++ show r1 ++ ") (" ++ show r2 ++ ") "
+
+-- i0: CPY (R 1) (R 2)      r2 := r1
+-- i1: INC (R 0)            do { r0++
+-- i2: DEC (R 2)                 r2--
+-- i3: JNZ (R 2) (V (-2))   while } (r2>0)
+-- i4: DEC (R 3)            r3--
+-- i5: JNZ (R 3) (V (-5))   while (r3>0)
+-- 
+-- when r1 > 0 && r3 > 0
+-- r0 := r0 + r1 * r3
+-- r2 := 0
+-- r3 := 0
+
+isMul env (CPY (R r1) (R r2))
+          (INC (R r0)) 
+          (DEC (R r2')) 
+          (JNZ (R r2'') (V (-2)))
+          (DEC (R r3))
+          (JNZ (R r3') (V (-5))) =
+  r2 == r2' && r2 == r2'' && r3 == r3' && (get r1 env) > 0 && (get r3 env) > 0
+isMul _ _ _ _ _ _ _ = False
+
+mul :: Instr -> Instr -> Instr -> Env -> Env
+mul (CPY (R r1) (R r2)) (INC (R r0)) (DEC (R r3)) env =
+  (set r0 v) . (set r2 0) . (set r3 0) $ env
+   where v = (get r0 env) + ((get r1 env) * (get r3 env))
+
+showMul (CPY (R r1) (R r2)) (INC (R r0)) (DEC (R r3)) =
+  "r" ++ show r0 ++ " += r" ++ show r2 ++ " * r" ++ show r3
+
 
 showEnv :: Env -> String
 showEnv = show . map snd . IntMap.toList 
